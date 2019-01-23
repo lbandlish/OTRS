@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[15]:
-
-
 import hashlib
-import os
 import random
 import secrets
 
+import click
 
-# In[16]:
+@click.group()
+@click.option('--timeit', is_flag=True)
+@click.pass_context
+def cli(ctx, timeit):
+    ctx.obj={
+        "timeit": timeit
+    }
 
 
 def PRG(seed):
@@ -22,11 +25,11 @@ def PRG(seed):
 def gen_seed(length):
     return format(secrets.randbits(length), f'0{length}b')
 
-#@click.command()
-#@click.argument('N')
-#@click.argument('pk')
-#@click.argument('l')
-def GenTestRing(N, pkl, l):
+@cli.command()
+@click.argument('N')
+@click.argument('pk')
+@click.argument('l')
+def gen_test_ring(N, pkl, l):
     """
     Generate a sample Ring.
     args:
@@ -37,9 +40,7 @@ def GenTestRing(N, pkl, l):
     returns:
         A ring of N people, each person has a public key of type [128]
     """
-    
     R = []
-    
     for j in range(N):
         if j == l:
             R.append(pkl)
@@ -51,8 +52,9 @@ def GenTestRing(N, pkl, l):
             R.append(pkj)
     return R
 
-#@click.command()
-def GenKey():
+@cli.command()
+@click.pass_obj
+def genkey(ctx):
     # Generate a public/private key pair
     
     sk = []
@@ -68,14 +70,14 @@ def GenKey():
         pk1 = PRG(s1)        
         pk2 = PRG(s2) 
         pk.append(format((int(pk1,2)^int(pk2,2)), '0384b'))
-    
+
+    if not ctx['timeit']:
+        click.echo(sk)
+        click.echo(pk)
     return (sk, pk)
 
 
-# In[7]:
-
-
-def RSign(R, skl, l, m):
+def Sign(R, skl, l, m):
     """
     Performs a ring signature
     
@@ -136,11 +138,7 @@ def RSign(R, skl, l, m):
     
     return (x, r)
 
-
-# In[8]:
-
-
-def RVerify(R, sigma, m):
+def Verify(R, sigma, m):
     """
     Verifies a ring signature
     
@@ -179,28 +177,19 @@ def RVerify(R, sigma, m):
     return xl==z2
 
 
-# In[12]:
-
-
-l=0
-(sk, pk) = GenKey()
-R = GenTestRing(128, pk, l)
-
-
-# In[13]:
-
-
-sigma= RSign(R, sk, l, "I'm a test message")
-
-
-# In[14]:
-
-
-RVerify(R, sigma, "I'm a test message")
-
-
-# In[ ]:
+#l=0
+#(sk, pk) = GenKey()
+#R = GenTestRing(128, pk, l)
 
 
 
 
+#sigma= RSign(R, sk, l, "I'm a test message")
+
+
+
+
+#RVerify(R, sigma, "I'm a test message")
+
+if __name__ == '__main__':
+    cli()
