@@ -2,8 +2,11 @@
 # coding: utf-8
 
 import hashlib
+import json
+import os
 import random
 import secrets
+from timeit import default_timer as timer
 
 import click
 
@@ -26,37 +29,46 @@ def gen_seed(length):
     return format(secrets.randbits(length), f'0{length}b')
 
 @cli.command()
-@click.argument('N')
-@click.argument('pk')
+@click.argument('n')
+@click.argument('pk', type=click.Path(exists=True))
 @click.argument('l')
-def gen_test_ring(N, pkl, l):
+def gen_test_ring(n, pk, l):
     """
     Generate a sample Ring.
     args:
         N: The number of people in the ring
-        pkl: the public key that we know
+        pkl: the public key file
         l: the position of the public key
         
     returns:
         A ring of N people, each person has a public key of type [128]
     """
     R = []
-    for j in range(N):
+    click.echo(pk)
+    pk=json.loads(pk)
+    for j in range(n):
         if j == l:
-            R.append(pkl)
+            R.append(pk)
         else:
             pkj=[]
             for i in range(128):                
                 pk = gen_seed(128)
                 pkj.append(pk)
             R.append(pkj)
+
+    with open('OTRS.ring', 'w') as outfile:
+        json.dump(R, outfile, indent=4)
+
     return R
 
 @cli.command()
 @click.pass_obj
 def genkey(ctx):
+
+    if ctx['timeit']:
+        start = timer()
+
     # Generate a public/private key pair
-    
     sk = []
     pk = []
     for j in range(128):
@@ -71,9 +83,15 @@ def genkey(ctx):
         pk2 = PRG(s2) 
         pk.append(format((int(pk1,2)^int(pk2,2)), '0384b'))
 
-    if not ctx['timeit']:
-        click.echo(sk)
-        click.echo(pk)
+    with open('OTRS.pub', 'w') as outfile:
+        json.dump(sk, outfile, indent=4)
+
+    with open('OTRS.priv', 'w') as outfile:
+        json.dump(pk, outfile, indent=4)
+
+    if ctx['timeit']:
+        end = timer()
+        click.echo(end - start)
     return (sk, pk)
 
 
