@@ -30,7 +30,7 @@ def gen_seed(length):
 
 @cli.command()
 @click.argument('n')
-@click.argument('pk', type=click.Path(exists=True))
+@click.argument('pk', type=click.File('rb'))
 @click.argument('l')
 def gen_test_ring(n, pk, l):
     """
@@ -44,9 +44,8 @@ def gen_test_ring(n, pk, l):
         A ring of N people, each person has a public key of type [128]
     """
     R = []
-    click.echo(pk)
-    pk=json.loads(pk)
-    for j in range(n):
+    pk=json.load(pk)
+    for j in range(int(n)):
         if j == l:
             R.append(pk)
         else:
@@ -55,10 +54,8 @@ def gen_test_ring(n, pk, l):
                 pk = gen_seed(128)
                 pkj.append(pk)
             R.append(pkj)
-
     with open('OTRS.ring', 'w') as outfile:
         json.dump(R, outfile, indent=4)
-
     return R
 
 @cli.command()
@@ -76,17 +73,17 @@ def genkey(ctx):
         # generate 2 random secret keys. 
         s1 = gen_seed(128)
         s2 = gen_seed(128)
-        sk.append((s1,s2))
+        sk.append((s1, s2))
         
         # use each secret key as the seed to the PRG that will generate the public key
         pk1 = PRG(s1)        
         pk2 = PRG(s2) 
         pk.append(format((int(pk1,2)^int(pk2,2)), '0384b'))
 
-    with open('OTRS.pub', 'w') as outfile:
+    with open('OTRS.priv', 'w') as outfile:
         json.dump(sk, outfile, indent=4)
 
-    with open('OTRS.priv', 'w') as outfile:
+    with open('OTRS.pub', 'w') as outfile:
         json.dump(pk, outfile, indent=4)
 
     if ctx['timeit']:
@@ -95,7 +92,12 @@ def genkey(ctx):
     return (sk, pk)
 
 
-def Sign(R, skl, l, m):
+@cli.command()
+@click.argument('ring', type=click.File('rb'))
+@click.argument('skl', type=click.File('rb'))
+@click.argument('l')
+@click.argument('m')
+def Sign(ring, skl, l, m):
     """
     Performs a ring signature
     
@@ -105,6 +107,10 @@ def Sign(R, skl, l, m):
         l: the position we are in R Note: maybe this should be the pk, and we can check for pk match in R
         m: the message signed
     """
+    R=json.load(ring)
+    skl=json.load(skl)
+    l=int(l)
+
     x = []
     r = []
     c=[]
@@ -135,7 +141,7 @@ def Sign(R, skl, l, m):
         r.append(ri)
         
     # hash it!
-    z = hashlib.shake_128("{R}{m}{c}".format(R=str(R), m=m, c=str(c)).encode('utf-8')).hexdigest(length=16)
+    z = hashlib.shake_128("{R}{m}{c}".format(R=str(R), m=m, c=str(c)).encode('utf-8')).hexdigest(16)
     z2 = int(z, 16)
 
     # get the ⊕x[i!=l]
@@ -153,10 +159,17 @@ def Sign(R, skl, l, m):
     r[l]=[0 for x in range(128)]    
     for j in range(128):        
         r[l][j]=skl[j][int(x[l][j])]
-    
+
+    with open('message.enc', 'w') as outfile:
+        json.dump({'x': x, 'r': r}, outfile, indent=4)
     return (x, r)
 
-def Verify(R, sigma, m):
+
+@cli.command()
+@click.argument('ring', type=click.File('rb'))
+@click.argument('sigma', type=click.File('rb'))
+@click.argument('m')
+def Verify(ring, sigma, m):
     """
     Verifies a ring signature
     
@@ -165,11 +178,14 @@ def Verify(R, sigma, m):
         sigma: The signature to verify
         m: the message signed
     """
+    sigma = json.load(sigma)
+    R=json.load(ring)
     # parse sigma into x and r
-    x=sigma[0]
-    r=sigma[1]
+    x=sigma['x']
+    r=sigma['r']
     c=[]
-    
+
+
     for i, xi in enumerate(x):
         ci=[]
         for j in range(128):
@@ -183,15 +199,13 @@ def Verify(R, sigma, m):
         c.append(ci)
     
     # hash it!
-    z = hashlib.shake_128("{R}{m}{c}".format(R=str(R), m=m, c=str(c)).encode('utf-8')).hexdigest(length=16)
+    z = hashlib.shake_128("{R}{m}{c}".format(R=str(R), m=m, c=str(c)).encode('utf-8')).hexdigest(16)
     z2 = int(z, 16)
 
     # get ⊕x[i]
     xl=0
     for i in range(128):
         xl=int(x[i],2)^xl    
-
-    # verify that ⊕x[i]==z2
     return xl==z2
 
 

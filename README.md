@@ -14,4 +14,11 @@ that uses their key more than once loses anonymity.
 
 `pipenv shell`
 
-`OTRS.py genkey`
+`python3 OTRS.py genkey`
+
+`python3 OTRS.py gen-test-ring 128 ./OTRS.pub 0`
+
+`python3 OTRS.py sign OTRS.ring OTRS.priv 0 "test"`
+
+
+` python3 OTRS.py verify OTRS.ring message.enc "test"`
