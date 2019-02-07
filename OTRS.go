@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/davidminor/uint128"
 	"log"
-	"math/rand"
 	"time"
 )
 
@@ -48,15 +47,30 @@ func PRG(seed uint128.Uint128) uint128.Uint128 {
 	Use the given seed as a parameter to the PRG, output a pseudo random value
 	 */
 
-	rand.Seed(int64(seed.H))
+	h := make([]byte, 128)
+	seedtohash := string(fmt.Sprintf("%v", seed))
+	sha3.ShakeSum128(h, []byte(seedtohash))
+	hH := uint64(binary.LittleEndian.Uint64(h[:64]))
+	hL := uint64(binary.LittleEndian.Uint64(h[64:128]))
+
+	return uint128.Uint128{hH, hL}
+
+	/*rand.Seed(int64(seed.H))
 	randH := rand.Uint64()
 	randH2 := rand.Uint64()
+	randH3 := rand.Uint64()
+	randH4 := rand.Uint64()
 
 	rand.Seed(int64(seed.L))
 	randL := rand.Uint64()
 	randL2 := rand.Uint64()
+	randL3 := rand.Uint64()
+	randL4 := rand.Uint64()
 
-	return uint128.Uint128{randH^randL2, randL^randH2}
+	return [3]uint128.Uint128{
+		uint128.Uint128{randL^randH2, randH^randL2},
+		uint128.Uint128{randL^randH3, randH^randL3},
+		uint128.Uint128{randL^randH4, randH^randL4}}*/
 }
 
 func GenKey() ([128][2]uint128.Uint128, [128]uint128.Uint128) {
@@ -208,7 +222,7 @@ func GetRunTime(ring_size int){
 	sign_elapsed := time.Since(sign_time)
 
 	verify_time := time.Now()
-	RVerify(ring, x, r, message)
+	fmt.Println(RVerify(ring, x, r, message))
 	verify_elapsed := time.Since(verify_time)
 
 	log.Printf("Ring size: %d, sign time: %s, verify time: %s", ring_size, sign_elapsed, verify_elapsed)
