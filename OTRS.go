@@ -4,136 +4,65 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/davidminor/uint128"
+	"log"
 	"math/rand"
-
+	"time"
 )
 
 import "golang.org/x/crypto/sha3"
 
+func getbit(x uint128.Uint128, i int) uint8 {
+	var bit uint8
+	if i < 64 {
+		//fmt.Println(string(strconv.FormatUint(x.H, 2))[0])
+		//fmt.Println(strconv.FormatUint(x.H, 2)[0])
 
-
-//import "github.com/davidminor/uint128"
-
-
-
-/*
-func getbit(x uint128.Uint128, i int) uint8{
-	if i<128 {
-		fmt.Println(string(strconv.FormatUint(x.L, 2))[0])
-		fmt.Println(strconv.FormatUint(x.L, 2)[0])
-
-		return fmt.Sprintf("%b", x.L)[i]
-	} else{
-		return fmt.Sprintf("%b", x.L)[i-128]
+		bit = fmt.Sprintf("%064b", x.H)[i]
+	} else {
+		bit = fmt.Sprintf("%064b", x.L)[i-64]
 	}
-}
-*/
 
-func getbit(x uint64, i int) int{
-	if fmt.Sprintf("%b", x)[i] == 48{
+	// uint 48 == 0 in binary
+	if bit == 48 {
 		return 0
-	}	else {
+	} else {
 		return 1
 	}
 }
 
-func randint64() (uint64) {
+func randint128() uint128.Uint128 {
 	/*
 	Use crypto rand to generate a random 64 bit number
 	 */
 
 	var b [8]byte
 	if _, err := crand.Read(b[:]); err != nil {
-		return 0
+		return uint128.Uint128{0, 0}
 	}
-	return binary.LittleEndian.Uint64(b[:])
+	return uint128.Uint128{binary.LittleEndian.Uint64(b[:]), binary.LittleEndian.Uint64(b[:])}
 }
 
-func PRG(seed uint64) uint64{
+func PRG(seed uint128.Uint128) uint128.Uint128 {
 	/*
 	Use the given seed as a parameter to the PRG, output a pseudo random value
 	 */
 
-	rand.Seed(int64(seed))
-	randnum := rand.Uint64()
-	return randnum
+	rand.Seed(int64(seed.H))
+	randH := rand.Uint64()
+	rand.Seed(int64(seed.L))
+	randL := rand.Uint64()
+
+	return uint128.Uint128{randH, randL}
 }
 
-
-func RSign(
-	ring [][128]uint64,
-	secret_key [128][2]uint64,
-	l int,
-	message string) ([]uint64, [][128]uint64){
-
-	var r [][128]uint64
-	var x []uint64
-	var c [][128]uint64
-
-	for i:=0; i< len(ring); i++ {
-		var ri [128]uint64
-		var ci [128]uint64
-		x[i] = randint64()
-
-		if i==l{
-			for j:=0; j<128; j++{
-				ci[i] = PRG(secret_key[j][0])
-			}
-		} else {
-			for j:=0; j<128; j++{
-				rij := randint64()
-				prg_rij := PRG(rij)
-
-				//bit at xi_j is 0
-				if getbit(x[i], j) == 0{
-					ci[j] = prg_rij
-				} else {
-					ci[j] = prg_rij ^ ring[i][j]
-				}
-
-				ri[j]=rij
-
-			}
-
-		}
-
-		c[i] = ci
-		r[i] = ri
-	}
-
-	h := make([]byte, 128)
-	tohash := string(fmt.Sprintf("%v%v%v", ring, message, c))
-	sha3.ShakeSum128(h, []byte(tohash))
-
-	var xl uint64
-	xl = 0
-
-	for i:=0; i<128; i++{
-		if i!=l{
-			xl=x[i]^xl
-		}
-	}
-
-	h2 := uint64(binary.LittleEndian.Uint64(h))
-	x[l] = xl ^ h2
-
-	for j:=0; j<128; j++{
-		r[l][j] = secret_key[j][getbit(x[l],j)]
-	}
-
-
-
-	return x, r
-}
-
-
-func GenKey() ([128][2]uint64, [128]uint64) {
-	var sk [128][2]uint64
-	var pk [128]uint64
+func GenKey() ([128][2]uint128.Uint128, [128]uint128.Uint128) {
+	var sk [128][2]uint128.Uint128
+	var pk [128]uint128.Uint128
 
 	for i := 0; i < 128; i++ {
-		var s0 = randint64()
-		var s1 = randint64()
+		var s0 = randint128()
+		var s1 = randint128()
 
 		sk[i][0] = s0
 		sk[i][1] = s1
@@ -141,43 +70,144 @@ func GenKey() ([128][2]uint64, [128]uint64) {
 		var pk0 = PRG(s0)
 		var pk1 = PRG(s1)
 
-		pk[i]= pk0^pk1
+		pk[i] = pk0.Xor(pk1)
 
 	}
 	return sk, pk
 }
 
-func GenTestRing(size int, pk [128]uint64, position int) ([][128]uint64){
-	var ring = make([][128]uint64, 0)
+func GenTestRing(size int, pk [128]uint128.Uint128, position int) [][128]uint128.Uint128 {
+	var ring = make([][128]uint128.Uint128, 0)
 
-	for i:= 0; i<size; i++ {
-		if i == position{
+	for i := 0; i < size; i++ {
+		if i == position {
 			ring = append(ring, pk)
 		} else {
-			var pkj [128]uint64
-			for j :=0; j< 128; j++{
-				var pk = uint64(randint64())
-				pkj[j]=pk
+			var pkj [128]uint128.Uint128
+			for j := 0; j < 128; j++ {
+				var pk = randint128()
+				pkj[j] = pk
 			}
-			ring =append(ring, pkj)
+			ring = append(ring, pkj)
 
 		}
 	}
 	return ring
 }
 
+func RSign(
+	ring [][128]uint128.Uint128,
+	secret_key [128][2]uint128.Uint128,
+	l int,
+	message string) ([]uint128.Uint128, [][128]uint128.Uint128) {
+
+	var r [][128]uint128.Uint128
+	var x []uint128.Uint128
+	var c [][128]uint128.Uint128
+
+	sign_start := time.Now()
+
+	for i := 0; i < len(ring); i++ {
+		var ri [128]uint128.Uint128
+		var ci [128]uint128.Uint128
+
+		x = append(x, randint128())
+
+		if i == l {
+			for j := 0; j < 128; j++ {
+				ci[j] = PRG(secret_key[j][0])
+			}
+		} else {
+			for j := 0; j < 128; j++ {
+				rij := randint128()
+				prg_rij := PRG(rij)
+
+				//bit at xi_j is 0
+				if getbit(x[i], j) == 0 {
+					ci[j] = prg_rij
+				} else {
+					ci[j] = prg_rij.Xor(ring[i][j])
+				}
+				ri[j] = rij
+			}
+		}
+		c = append(c, ci)
+		r = append(r, ri)
+	}
+	log.Printf("Looping took %s with ring size %d", time.Since(sign_start), len(ring))
+
+	hash_start := time.Now()
+
+	h := make([]byte, 128)
+	tohash := string(fmt.Sprintf("%v%v%v", ring, message, c))
+	sha3.ShakeSum128(h, []byte(tohash))
+	hH := uint64(binary.LittleEndian.Uint64(h[:64]))
+	hL := uint64(binary.LittleEndian.Uint64(h[64:128]))
+
+	h2 := uint128.Uint128{hH, hL}
+
+	log.Printf("Hashing took %s with ring size %d", time.Since(hash_start), len(ring))
+
+	xl := uint128.Uint128{0, 0}
+
+	for i := 0; i < len(ring); i++ {
+		if i != l {
+			xl = x[i].Xor(xl)
+		}
+	}
+	x[l] = xl.Xor(h2)
+
+	for j := 0; j < 128; j++ {
+		r[l][j] = secret_key[j][getbit(x[l], j)]
+	}
+	return x, r
+}
+
+func RVerify(ring [][128]uint128.Uint128,
+	x []uint128.Uint128,
+	r [][128]uint128.Uint128,
+	message string) (bool) {
+
+	var c [][128]uint128.Uint128
+	for i := 0; i < len(ring); i++ {
+		var ci [128]uint128.Uint128
+		for j := 0; j < 128; j++ {
+			prg_rij := PRG(r[i][j])
+			if getbit(x[i], j) == 0 {
+				ci[j] = prg_rij
+			} else {
+				ci[j] = prg_rij.Xor(ring[i][j])
+			}
+
+		}
+		c = append(c, ci)
+	}
+
+	h := make([]byte, 128)
+	tohash := string(fmt.Sprintf("%v%v%v", ring, message, c))
+	sha3.ShakeSum128(h, []byte(tohash))
+	hH := uint64(binary.LittleEndian.Uint64(h[:64]))
+	hL := uint64(binary.LittleEndian.Uint64(h[64:128]))
+	h2 := uint128.Uint128{hH, hL}
+
+	xl := uint128.Uint128{0, 0}
+	for i := 0; i < len(ring); i++ {
+		xl = x[i].Xor(xl)
+
+	}
+	return xl == h2
+}
+
 func main() {
 
-
 	var sk, pk = GenKey()
-	fmt.Println(sk)
-	fmt.Println(pk)
+	var ring = GenTestRing(1024, pk, 0)
 
-	var ring = GenTestRing(2, pk, 0)
-	fmt.Println(ring)
+	start := time.Now()
+	x, r := RSign(ring, sk, 0, "testadsfsadfsa")
+	elapsed := time.Since(start)
+	log.Printf("Signing took %s with ring size %d", elapsed, len(ring))
 
-	r, x := RSign(ring, sk, 0, "test")
-	fmt.Println(r)
-	fmt.Println(x)
+	fmt.Println(RVerify(ring, x, r, "testadsfsadfsa"))
 
 }
