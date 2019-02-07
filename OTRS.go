@@ -50,10 +50,13 @@ func PRG(seed uint128.Uint128) uint128.Uint128 {
 
 	rand.Seed(int64(seed.H))
 	randH := rand.Uint64()
+	randH2 := rand.Uint64()
+
 	rand.Seed(int64(seed.L))
 	randL := rand.Uint64()
+	randL2 := rand.Uint64()
 
-	return uint128.Uint128{randH, randL}
+	return uint128.Uint128{randH^randL2, randL^randH2}
 }
 
 func GenKey() ([128][2]uint128.Uint128, [128]uint128.Uint128) {
@@ -105,7 +108,6 @@ func RSign(
 	var x []uint128.Uint128
 	var c [][128]uint128.Uint128
 
-	sign_start := time.Now()
 
 	for i := 0; i < len(ring); i++ {
 		var ri [128]uint128.Uint128
@@ -134,9 +136,6 @@ func RSign(
 		c = append(c, ci)
 		r = append(r, ri)
 	}
-	log.Printf("Looping took %s with ring size %d", time.Since(sign_start), len(ring))
-
-	hash_start := time.Now()
 
 	h := make([]byte, 128)
 	tohash := string(fmt.Sprintf("%v%v%v", ring, message, c))
@@ -145,8 +144,6 @@ func RSign(
 	hL := uint64(binary.LittleEndian.Uint64(h[64:128]))
 
 	h2 := uint128.Uint128{hH, hL}
-
-	log.Printf("Hashing took %s with ring size %d", time.Since(hash_start), len(ring))
 
 	xl := uint128.Uint128{0, 0}
 
@@ -198,16 +195,32 @@ func RVerify(ring [][128]uint128.Uint128,
 	return xl == h2
 }
 
-func main() {
+func GetRunTime(ring_size int){
+	message := "this is a message we'll sign"
+	position := 1
 
 	var sk, pk = GenKey()
-	var ring = GenTestRing(1024, pk, 0)
+	var ring = GenTestRing(ring_size, pk, position)
 
-	start := time.Now()
-	x, r := RSign(ring, sk, 0, "testadsfsadfsa")
-	elapsed := time.Since(start)
-	log.Printf("Signing took %s with ring size %d", elapsed, len(ring))
 
-	fmt.Println(RVerify(ring, x, r, "testadsfsadfsa"))
+	sign_time := time.Now()
+	x, r := RSign(ring, sk, position, message)
+	sign_elapsed := time.Since(sign_time)
+
+	verify_time := time.Now()
+	RVerify(ring, x, r, message)
+	verify_elapsed := time.Since(verify_time)
+
+	log.Printf("Ring size: %d, sign time: %s, verify time: %s", ring_size, sign_elapsed, verify_elapsed)
+
+}
+
+func main() {
+
+	ring_sizes := [7]int{128, 256, 512, 1024, 2048, 4096, 8192}
+
+	for _, size := range ring_sizes{
+		GetRunTime(size)
+	}
 
 }

@@ -12,6 +12,6 @@ that uses their key more than once loses anonymity.
 
 ### Usage
 
-`pipenv shell`
+`go build OTRS.go`
 
-`OTRS.py genkey`
+`./OTRS.go`
