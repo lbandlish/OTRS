@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/davidminor/uint128"
-	"log"
 	"time"
 )
 
@@ -35,16 +34,20 @@ func randint128() uint128.Uint128 {
 	Use crypto rand to generate a random 64 bit number
 	 */
 
-	var b [8]byte
+	var b [16]byte
 	if _, err := crand.Read(b[:]); err != nil {
 		return uint128.Uint128{0, 0}
 	}
-	return uint128.Uint128{binary.LittleEndian.Uint64(b[:]), binary.LittleEndian.Uint64(b[:])}
+
+	H := binary.LittleEndian.Uint64(b[:8])
+	L := binary.LittleEndian.Uint64(b[8:16])
+
+	return uint128.Uint128{H,L}
 }
 
 func PRG(seed uint128.Uint128) uint128.Uint128 {
 	/*
-	Use the given seed as a parameter to the PRG, output a pseudo random value
+	Use the given seed as a parameter to the PRG, hash it and output it
 	 */
 
 	h := make([]byte, 128)
@@ -211,7 +214,7 @@ func RVerify(ring [][128]uint128.Uint128,
 
 func GetRunTime(ring_size int){
 	message := "this is a message we'll sign"
-	position := 1
+	position := 0
 
 	var sk, pk = GenKey()
 	var ring = GenTestRing(ring_size, pk, position)
@@ -222,16 +225,20 @@ func GetRunTime(ring_size int){
 	sign_elapsed := time.Since(sign_time)
 
 	verify_time := time.Now()
-	fmt.Println(RVerify(ring, x, r, message))
+	RVerify(ring, x, r, message)
 	verify_elapsed := time.Since(verify_time)
+	fmt.Printf("%d, %s, %s\n", ring_size, sign_elapsed, verify_elapsed)
 
-	log.Printf("Ring size: %d, sign time: %s, verify time: %s", ring_size, sign_elapsed, verify_elapsed)
+	//log.Printf("Ring size: %d, sign time: %s, verify time: %s", ring_size, sign_elapsed, verify_elapsed)
+	//fmt.Println(x)
+	//fmt.Println(r)
+
 
 }
 
 func main() {
 
-	ring_sizes := [7]int{128, 256, 512, 1024, 2048, 4096, 8192}
+	ring_sizes := [8]int{2, 128, 256, 512, 1024, 2048, 4096, 8192}
 
 	for _, size := range ring_sizes{
 		GetRunTime(size)
