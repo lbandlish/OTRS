@@ -31,7 +31,7 @@ func getbit(x uint128.Uint128, i int) uint8 {
 
 func randint128() uint128.Uint128 {
 	/*
-	Use crypto rand to generate a random 64 bit number
+	Use crypto rand to generate a random uint128
 	 */
 
 	var b [16]byte
@@ -42,12 +42,12 @@ func randint128() uint128.Uint128 {
 	H := binary.LittleEndian.Uint64(b[:8])
 	L := binary.LittleEndian.Uint64(b[8:16])
 
-	return uint128.Uint128{H,L}
+	return uint128.Uint128{H, L}
 }
 
 func PRG(seed uint128.Uint128) uint128.Uint128 {
 	/*
-	Use the given seed as a parameter to the PRG, hash it and output it
+	Use the given seed as a parameter to the "PRG", hash it and output it
 	 */
 
 	h := make([]byte, 128)
@@ -57,26 +57,12 @@ func PRG(seed uint128.Uint128) uint128.Uint128 {
 	hL := uint64(binary.LittleEndian.Uint64(h[64:128]))
 
 	return uint128.Uint128{hH, hL}
-
-	/*rand.Seed(int64(seed.H))
-	randH := rand.Uint64()
-	randH2 := rand.Uint64()
-	randH3 := rand.Uint64()
-	randH4 := rand.Uint64()
-
-	rand.Seed(int64(seed.L))
-	randL := rand.Uint64()
-	randL2 := rand.Uint64()
-	randL3 := rand.Uint64()
-	randL4 := rand.Uint64()
-
-	return [3]uint128.Uint128{
-		uint128.Uint128{randL^randH2, randH^randL2},
-		uint128.Uint128{randL^randH3, randH^randL3},
-		uint128.Uint128{randL^randH4, randH^randL4}}*/
 }
 
 func GenKey() ([128][2]uint128.Uint128, [128]uint128.Uint128) {
+	/*
+	Generates a public private key pair.
+	 */
 	var sk [128][2]uint128.Uint128
 	var pk [128]uint128.Uint128
 
@@ -124,7 +110,6 @@ func RSign(
 	var r [][128]uint128.Uint128
 	var x []uint128.Uint128
 	var c [][128]uint128.Uint128
-
 
 	for i := 0; i < len(ring); i++ {
 		var ri [128]uint128.Uint128
@@ -180,7 +165,7 @@ func RSign(
 func RVerify(ring [][128]uint128.Uint128,
 	x []uint128.Uint128,
 	r [][128]uint128.Uint128,
-	message string) (bool) {
+	message string) bool {
 
 	var c [][128]uint128.Uint128
 	for i := 0; i < len(ring); i++ {
@@ -212,13 +197,12 @@ func RVerify(ring [][128]uint128.Uint128,
 	return xl == h2
 }
 
-func GetRunTime(ring_size int){
+func GetRunTime(ring_size int) {
 	message := "this is a message we'll sign"
 	position := 0
 
 	var sk, pk = GenKey()
 	var ring = GenTestRing(ring_size, pk, position)
-
 
 	sign_time := time.Now()
 	x, r := RSign(ring, sk, position, message)
@@ -228,19 +212,13 @@ func GetRunTime(ring_size int){
 	RVerify(ring, x, r, message)
 	verify_elapsed := time.Since(verify_time)
 	fmt.Printf("%d, %s, %s\n", ring_size, sign_elapsed, verify_elapsed)
-
-	//log.Printf("Ring size: %d, sign time: %s, verify time: %s", ring_size, sign_elapsed, verify_elapsed)
-	//fmt.Println(x)
-	//fmt.Println(r)
-
-
 }
 
 func main() {
 
 	ring_sizes := [8]int{2, 128, 256, 512, 1024, 2048, 4096, 8192}
 
-	for _, size := range ring_sizes{
+	for _, size := range ring_sizes {
 		GetRunTime(size)
 	}
 
